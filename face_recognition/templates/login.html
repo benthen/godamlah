@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Login</h2>
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{message.extra_tags}}">
+        <p>{{ message }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label class="form-label">Username</label>
+            {{ form.username}}
+        </div>
+        <div class="mb-3">
+            <label class="form-label">MyKad</label>
+            {{ form.identity_number}}
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            {{ form.password}}
+        </div>
+        <button type="submit" class="btn btn-primary">Login</button>
+    </form>
+</div>
+{% endblock %}

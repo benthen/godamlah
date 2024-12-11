@@ -1,0 +1,41 @@
+#video-container {
+    display: inline-block;
+    margin: 20px 0;
+}
+body {
+    background-color: #f0f8ff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    text-align: center;
+}
+.voice-interface {
+    width: 100%;
+    max-width: 600px;
+    padding: 20px;
+    background: #fff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+canvas {
+    width: 100%;
+    height: 150px;
+    display: block;
+}
+.mic-button {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 70px;
+    height: 70px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    font-size: 30px;
+}
+.mic-button:hover {
+    background-color: #0056b3;
+}

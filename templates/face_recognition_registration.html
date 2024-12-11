@@ -1,0 +1,13 @@
+<!-- templates/face_recognition_register.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Face Recognition - Registration</h2>
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="face_image" class="form-label">Upload your face image</label>
+        <input type="file" name="face_image" class="form-control" accept="image/*" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Submit</button>
+</form>
+{% endblock %}

@@ -1,0 +1,16 @@
+<!-- templates/face_recognition_login.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Face Recognition - Login</h2>
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="face_image" class="form-label">Upload your face image</label>
+        <input type="file" name="face_image" class="form-control" accept="image/*" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Verify</button>
+</form>
+{% endblock %}

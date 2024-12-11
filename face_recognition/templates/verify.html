@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+{% block title %}Verification{% endblock %}
+{% load static %}
+{% block style %}
+<link rel="stylesheet" href="{% static 'css/verify.css' %}" />
+{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-8">
+            <h3>Live Camera Feed</h3>
+            <p>Please blink to verify that you are a real user.</p>
+            <div id="video-container">
+                <img id="video-feed" src="/video_feed/" alt="Live Video Feed" onerror="retryVideoFeed()">
+            </div>
+            <p id="success-message" style="color: green; font-weight: bold; display: none;">Face successfully captured!
+            </p>
+        </div>
+        <div class="col-4">
+            <!-- Voice Capture -->
+            <div class="mb-4">
+                <h3>Voice Assistant</h3>
+                <div class="voice-interface">
+                    <p>Please read the following sentence aloud:</p>
+                    <h4>{{voice_auth_sentence}}</h4>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-center mb-3">
+                            <button class="mic-button" id="mic-btn">🎤</button>
+                        </div>
+                        <p>Click the microphone and start speaking</p>
+                    </form>
+                    <canvas id="visualizer"></canvas>
+                    <p id="status"></p>
+                    <div id="voice-result"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <form action="" id="hidden-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" id="face-recognition" name="face-recognition">
+        <input type="hidden" id="voice-recognition" name="voice-recognition">
+    </form>
+</div>
+
+<script>
+
+    function retryVideoFeed() {
+        var videoFeed = document.getElementById('video-feed');
+        // Retry loading the video feed after 3 seconds
+        setTimeout(function () {
+            videoFeed.src = '/video_feed/';
+        }, 2000); // 3 seconds delay to retry
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const videoFeed = document.getElementById('video-feed');
+        const successMessage = document.getElementById('success-message');
+        const faceInput = document.getElementById('face-recognition');
+        const voiceInput = document.getElementById('voice-recognition');
+
+        // Poll the video stream for success message
+        videoFeed.addEventListener('load', function () {
+            fetch('/video_feed/')
+                .then((response) => response.text())
+                .then((data) => {
+                    if (data.includes('Face captured successfully')) {
+                        successMessage.style.display = 'block';
+                        successMessage.innerText = 'Face successfully captured!';
+                        videoFeed.style.display = 'none'; // Hide video feed after success
+                        faceInput.value = 'True'; // Send face recognition flag to server
+                        if (voiceInput.value == "True") {
+                            document.getElementById('hidden-form').submit();
+                        }
+                    }
+                })
+                .catch((err) => console.error('Error checking stream:', err));
+        });
+    });
+
+    // voice interface
+    const micButton = document.getElementById('mic-btn');
+    const canvas = document.getElementById('visualizer');
+    const statusText = document.getElementById('status');
+    const canvasCtx = canvas.getContext('2d');
+
+    let audioContext, analyser, microphone, javascriptNode, mediaStream;
+
+    micButton.addEventListener('click', async (event) => {
+        event.preventDefault(); // Prevent form submission
+
+        const resultElement = document.getElementById('voice-result');
+        const voiceInput = document.getElementById('voice-recognition');
+        resultElement.innerText = "";
+
+        // CSRF token setup
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        // Initialize Audio Context and start listening
+        if (!audioContext) {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                microphone = audioContext.createMediaStreamSource(mediaStream);
+                javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+                microphone.connect(analyser);
+                analyser.connect(javascriptNode);
+                javascriptNode.connect(audioContext.destination);
+
+                javascriptNode.onaudioprocess = () => {
+                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(dataArray);
+                    drawVisualizer(dataArray);
+                };
+
+                statusText.textContent = 'Listening...';
+            } catch (error) {
+                console.error('Error accessing the microphone:', error);
+                resultElement.innerText = 'Unable to access microphone.';
+                resultElement.style.color = 'red';
+                return;
+            }
+        }
+
+        // Make a POST request to the Django view
+        try {
+            const response = await fetch('/capture_voice/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const data = await response.json();
+
+            if (data.message) {
+                resultElement.innerText = `Success: ${data.message}`;
+                resultElement.style.color = 'green';
+                stopAudio()
+                voiceInput.value = "True";
+                const faceInput = document.getElementById('face-recognition');
+                if(faceInput.value == "True"){
+                document.getElementById('hidden-form').submit();
+                }
+            } else if (data.error) {
+                resultElement.innerText = `Error: ${data.error}`;
+                resultElement.style.color = 'red';
+                stopAudio();
+            }
+        } catch (error) {
+            console.error('There was an error:', error);
+            resultElement.innerText = 'An unexpected error occurred.';
+            resultElement.style.color = 'red';
+            stopAudio(); // Stop audio if there's a fetch error
+        }
+    });
+
+    function drawVisualizer(dataArray) {
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+
+        canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+
+        const barWidth = (WIDTH / dataArray.length) * 2.5;
+        let barHeight;
+        let x = 0;
+
+        for (let i = 0; i < dataArray.length; i++) {
+            barHeight = dataArray[i];
+
+            canvasCtx.fillStyle = 'rgb(50, 150, 255)';
+            canvasCtx.fillRect(x, HEIGHT - barHeight / 2, barWidth, barHeight / 2);
+
+            x += barWidth + 1;
+        }
+    }
+
+    function stopAudio() {
+        if (audioContext) {
+            if (microphone) {
+                microphone.disconnect();
+            }
+            if (javascriptNode) {
+                javascriptNode.disconnect();
+                javascriptNode = null;
+            }
+            if (mediaStream) {
+                // Stop all tracks in the media stream
+                mediaStream.getTracks().forEach((track) => track.stop());
+                mediaStream = null;
+            }
+            audioContext.close();
+            audioContext = null;
+            statusText.textContent = '';
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+
+</script>
+{% endblock %}
