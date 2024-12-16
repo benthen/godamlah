@@ -7,7 +7,7 @@
 {% block content %}
 <div class="container">
     <h2>Register</h2>
-    <form action="" method="post" id="registerForm">
+    <form action="{% url 'face_recognition:register' %}" method="post" id="registerForm">
         {%csrf_token%}
         <div class="row">
             <div class="col">
@@ -129,7 +129,7 @@
             }
         });
 
-        function validatePassword() {
+        async function validatePassword() {
             const password = passwordInput.value;
             const confirmPassword = confirmPasswordInput.value;
 
@@ -141,17 +141,59 @@
             if (!/[!@#$%^&*(),.?\":{}|<>]/.test(password)) errors.push("Password must have at least one special character.");
 
             passwordError.textContent = errors.join(" ");
-            if (password !== confirmPassword && confirmPassword) {
+            if (password !== confirmPassword) {
                 confirmPasswordError.textContent = "Passwords do not match.";
             } else {
                 confirmPasswordError.textContent = "";
+                const usernameInput = document.getElementById("id_username");
+                const mykadInput = document.getElementById("id_identity_number");
+                const phoneInput = document.getElementById("id_phone_number");
+                const emailInput = document.getElementById("id_email");
+                const addressInput = document.getElementById("id_address");
+
+                const personalInfo = {
+                    "username": usernameInput.value,
+                    "mykad": mykadInput.value,
+                    "email": emailInput.value,
+                    "phoneNumber": phoneInput.value,
+                    "address": addressInput.value
+                };
+                const isStrong = await checkPasswordHygiene(password, personalInfo);
+                if (isStrong) {
+                    passwordError.textContent = "The password is strong to use"; // Password passed Gemini AI check
+                } else {
+                    passwordError.textContent = "The password contains too many personal information"; // Display issues detected by Gemini AI
+                }
             }
 
-            registerButton.disabled = errors.length > 0 || password !== confirmPassword;
+            // registerButton.disabled = errors.length > 0 || password !== confirmPassword;
         }
 
         passwordInput.addEventListener('input', validatePassword);
         confirmPasswordInput.addEventListener('input', validatePassword);
     });
+
+    async function checkPasswordHygiene(password, personalInfo) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        try {
+            const response = await fetch('/check-password-hygiene/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken // Include CSRF token for Django
+                },
+                body: JSON.stringify({ 
+                    "password": password, 
+                    "personalInfo": personalInfo 
+                })
+            });
+
+            const data = await response.json();
+            return data.is_strong;
+        } catch (error) {
+            console.error("Error checking password hygiene:", error);
+            return false;
+        }
+    }
 </script>
 {% endblock %}

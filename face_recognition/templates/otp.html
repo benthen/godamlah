@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% block title %}OTP Verification{% endblock %}
+{% load static %}
+{% block style %}
+<link rel="stylesheet" href="{% static 'css/verify.css' %}" />
+{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="mb-4">
+        <h3>Voice Assistant</h3>
+        <div class="voice-interface">
+            <p>The OTP is sent to your email</p>
+            <p>Please click the microphone and read the OTP</p>
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-flex justify-content-center mb-3">
+                    <button class="mic-button" id="mic-btn">🎤</button>
+                </div>
+                <p>Click the microphone and read the OTP</p>
+            </form>
+            <canvas id="visualizer"></canvas>
+            <p id="status"></p>
+            <div id="voice-result"></div>
+        </div>
+    </div>
+    <form action="" id="hidden-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" id="voice-recognition" name="voice-recognition">
+    </form>
+</div>
+
+<script>
+    // voice interface
+    const micButton = document.getElementById('mic-btn');
+    const canvas = document.getElementById('visualizer');
+    const statusText = document.getElementById('status');
+    const canvasCtx = canvas.getContext('2d');
+
+    let audioContext, analyser, microphone, javascriptNode, mediaStream;
+
+    micButton.addEventListener('click', async (event) => {
+        event.preventDefault(); // Prevent form submission
+
+        const resultElement = document.getElementById('voice-result');
+        const voiceInput = document.getElementById('voice-recognition');
+        resultElement.innerText = "";
+
+        // CSRF token setup
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        // Initialize Audio Context and start listening
+        if (!audioContext) {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                microphone = audioContext.createMediaStreamSource(mediaStream);
+                javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+                microphone.connect(analyser);
+                analyser.connect(javascriptNode);
+                javascriptNode.connect(audioContext.destination);
+
+                javascriptNode.onaudioprocess = () => {
+                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(dataArray);
+                    drawVisualizer(dataArray);
+                };
+
+                statusText.textContent = 'Listening...';
+            } catch (error) {
+                console.error('Error accessing the microphone:', error);
+                resultElement.innerText = 'Unable to access microphone.';
+                resultElement.style.color = 'red';
+                return;
+            }
+        }
+
+        const otp = "{{ otp }}";
+
+        // Make a POST request to the Django view
+
+        const response = await fetch('/capture_voice/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            }, body: JSON.stringify({
+                "otp": otp,
+                "message": "otp"
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+
+        const data = await response.json();
+
+        if (data.message) {
+            resultElement.innerText = `Success: ${data.message}`;
+            resultElement.style.color = 'green';
+            stopAudio()
+            voiceInput.value = "True";
+            document.getElementById('hidden-form').submit();
+        } else if (data.error) {
+            resultElement.innerText = `Error: ${data.error}`;
+            resultElement.style.color = 'red';
+            stopAudio();
+        }
+
+    });
+
+    function drawVisualizer(dataArray) {
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+
+        canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+
+        const barWidth = (WIDTH / dataArray.length) * 2.5;
+        let barHeight;
+        let x = 0;
+
+        for (let i = 0; i < dataArray.length; i++) {
+            barHeight = dataArray[i];
+
+            canvasCtx.fillStyle = 'rgb(50, 150, 255)';
+            canvasCtx.fillRect(x, HEIGHT - barHeight / 2, barWidth, barHeight / 2);
+
+            x += barWidth + 1;
+        }
+    }
+
+    function stopAudio() {
+        if (audioContext) {
+            if (microphone) {
+                microphone.disconnect();
+            }
+            if (javascriptNode) {
+                javascriptNode.disconnect();
+                javascriptNode = null;
+            }
+            if (mediaStream) {
+                // Stop all tracks in the media stream
+                mediaStream.getTracks().forEach((track) => track.stop());
+                mediaStream = null;
+            }
+            audioContext.close();
+            audioContext = null;
+            statusText.textContent = '';
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+</script>
+{% endblock %}

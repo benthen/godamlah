@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block title %}Verification{% endblock %}
+{% load static %}
+{% block style %}
+<link rel="stylesheet" href="{% static 'css/register.css' %}" />
+{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="question-container text-center">
+        <h3 id="question-text">{{ question.text }}</h3>
+        <input type="hidden" id="current-question-id" value="{{ question.id }}">
+        <div class="mt-4">
+            <textarea id="answer" class="form-control" rows="4" placeholder="Type your answer here..."></textarea>
+        </div>
+        <button id="next-btn" class="btn btn-primary mt-3">Next</button>
+        <button id="submit-btn" class="btn btn-success mt-3" style="display:none;">Submit All Answers</button>
+    </div>
+    <input type="hidden" id="hidden-value" value="{{user_id}}">
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    const user_id = document.getElementById("hidden-value").value;
+    $(document).ready(function () {
+        $('#next-btn').click(async function () {
+            const questionId = $('#current-question-id').val();
+            const answerText = $('#answer').val();
+
+            if (answerText.trim() === '') {
+                alert("Please provide an answer before proceeding.");
+                return;
+            }
+            const response = await fetch(`/question/${user_id}/${questionId}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    "X-CSRFToken": "{{ csrf_token }}" // Include CSRF token for Django
+                },
+                body: JSON.stringify({
+                    "question_id": questionId,
+                    "answer_text": answerText
+                }),
+            });
+            const data = await response.json();
+            if (!data.is_last) {
+                $('#question-text').text(data.text);
+                $('#current-question-id').val(data.id);
+                $('#answer').val('');
+            } else{
+                $('#question-text').text(data.text);
+                $('#current-question-id').val(data.id);
+                $('#answer').val('');
+                $('#next-btn').hide();
+                $('#submit-btn').show();
+            }
+        });
+    });
+
+    $('#submit-btn').click(async function () {
+        const questionId = $('#current-question-id').val();
+        const answerText = $('#answer').val();
+        // Send all answers to the server when submitting
+        const response = await fetch(`/submit-answers/`, {
+            url: "/submit-answers/",
+            method: "POST",
+            body: JSON.stringify({ 
+                "question_id": questionId,
+                "answer_text": answerText,
+                "user_id": user_id
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+        });
+
+        if (response.redirected) {
+            // Handle the redirect from the backend
+            window.location.href = response.url;
+        } else {
+            const data = await response.json();
+            alert(data.message || "Something went wrong.");
+        }
+
+    });
+</script>
+{% endblock %}

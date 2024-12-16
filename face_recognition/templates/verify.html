@@ -28,7 +28,6 @@
                         <div class="d-flex justify-content-center mb-3">
                             <button class="mic-button" id="mic-btn">🎤</button>
                         </div>
-                        <p>Click the microphone and start speaking</p>
                     </form>
                     <canvas id="visualizer"></canvas>
                     <p id="status"></p>
@@ -134,7 +133,9 @@
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken,
-                },
+                }, body: JSON.stringify({
+                    "message": "sentence"
+                })
             });
 
             if (!response.ok) {
@@ -142,6 +143,7 @@
             }
 
             const data = await response.json();
+            console.log(data)
 
             if (data.message) {
                 resultElement.innerText = `Success: ${data.message}`;
@@ -149,8 +151,8 @@
                 stopAudio()
                 voiceInput.value = "True";
                 const faceInput = document.getElementById('face-recognition');
-                if(faceInput.value == "True"){
-                document.getElementById('hidden-form').submit();
+                if (faceInput.value == "True") {
+                    document.getElementById('hidden-form').submit();
                 }
             } else if (data.error) {
                 resultElement.innerText = `Error: ${data.error}`;

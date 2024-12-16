@@ -29,7 +29,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -51,6 +50,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'face_recognition.middleware.UserBehaviorMiddleware'
 ]
 
 ROOT_URLCONF = 'django_godamlah.urls'
@@ -138,7 +138,7 @@ EMAIL_HOST_PASSWORD = 'xhms jlgv ypiy drpb'
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  # Keep the default backend
-    'face_recognition.auth_backends.IdentityNumberBackend',  # Add your custom backend
+    'face_recognition.auth_backends.CustomAuthenticationBackend',  # Add your custom backend
 ]
 
-# AUTH_USER_MODEL = 'face_recognition.User'
+AUTH_USER_MODEL = 'face_recognition.User'

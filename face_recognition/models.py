@@ -1,7 +1,8 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import AbstractUser
 
-class User(models.Model):
+class User(AbstractUser):
     username = models.CharField(max_length=100, unique=True, default="")
     identity_number = models.CharField(max_length=20, unique=True)
     email = models.EmailField(default="")
@@ -13,8 +14,5 @@ class User(models.Model):
     is_verified = models.BooleanField(default=False)
     password = models.CharField(max_length=100, default="")
         
-    def save(self, *args, **kwargs):
-        if self.password and not self.password.startswith('$'):
-            # Hash the password if it isn't already hashed
-            self.password = make_password(self.password)
-        super().save(*args, **kwargs)
+class Question(models.Model):
+    text = models.TextField()

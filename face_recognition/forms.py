@@ -41,6 +41,16 @@ class RegisterForm(forms.ModelForm):
 
         if password and confirm_password and password != confirm_password:
             raise ValidationError("Passwords do not match.")
+    
+    def save(self, commit=True):
+        # Get the user instance but don't save yet
+        user = super().save(commit=False)
+        # Hash the password
+        user.set_password(self.cleaned_data["password"])
+        # Save if commit=True
+        if commit:
+            user.save()
+        return user
         
 class LoginForm(forms.Form):
     username = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control'}))
