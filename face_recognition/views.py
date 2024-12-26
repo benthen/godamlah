@@ -20,7 +20,7 @@ import google.generativeai as genai
 from django.views.decorators.csrf import csrf_exempt
 
 VERIFICATION_SENTENCE = "I love to play badminton"
-GEMINI_API_KEY = "AIzaSyCNC5a5OIm7Dx0S-wfEGgkT1wU0Ixe7Ijw"
+GEMINI_API_KEY = "API_KEY"
 GEMINI_MODEL = "gemini-1.5-pro"
 genai.configure(api_key=GEMINI_API_KEY)
 MODEL = genai.GenerativeModel(GEMINI_MODEL)
