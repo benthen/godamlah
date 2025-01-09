@@ -47,15 +47,6 @@
         <div id="password-error" class="text-danger"></div>
         <div id="confirm-password-error" class="text-danger"></div>
 
-        <!-- Hidden Inputs for Behavior Metrics -->
-        <input type="hidden" id="id_latitude" name="latitude">
-        <input type="hidden" id="id_longitude" name="longitude">
-        <input type="hidden" id="id_device_type" name="device_type">
-        <input type="hidden" id="id_typing_speed" name="typing_speed">
-        <input type="hidden" id="id_mouse_movements" name="mouse_movements">
-        <input type="hidden" id="id_time_spent" name="time_spent">
-        <input type="hidden" id="id_keystroke_intervals" name="keystroke_intervals">
-
         <div class="d-flex justify-content-center">
             <button type="submit" class="btn btn-primary" id="registerButton">Register</button>
         </div>
@@ -68,66 +59,6 @@
         const registerButton = document.getElementById('registerButton');
         const passwordError = document.getElementById('password-error');
         const confirmPasswordError = document.getElementById('confirm-password-error');
-
-        // the metrics captured for user behaviour
-        const latitudeInput = document.getElementById('id_latitude');
-        const longitudeInput = document.getElementById('id_longitude');
-        const deviceTypeInput = document.getElementById('id_device_type');
-        const typingSpeedInput = document.getElementById('id_typing_speed');
-        const mouseMovementsInput = document.getElementById('id_mouse_movements');
-        const timeSpentInput = document.getElementById('id_time_spent');
-        const keystrokeIntervalsInput = document.getElementById('id_keystroke_intervals');
-
-        let mouseMovements = 0;
-        let startTime = Date.now();
-        let typingStartTime = 0;
-        let typingIntervals = [];
-
-        // Geolocation
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition((position) => {
-                latitudeInput.value = position.coords.latitude;
-                longitudeInput.value = position.coords.longitude;
-            });
-        }
-
-        // Detect Device Type
-        const isMobile = /Mobile|Android|iP(hone|ad|od)|Windows Phone/i.test(navigator.userAgent);
-        deviceTypeInput.value = isMobile ? 'Mobile' : 'Desktop';
-
-        // Mouse Movement Tracking
-        document.addEventListener('mousemove', () => {
-            mouseMovements++;
-            mouseMovementsInput.value = mouseMovements;
-        });
-
-        // Time Spent on Form
-        document.getElementById('registerForm').addEventListener('submit', () => {
-            const totalTimeSpent = Date.now() - startTime;
-            timeSpentInput.value = totalTimeSpent;
-        });
-
-        // Keystroke Patterns
-        passwordInput.addEventListener('keydown', () => {
-            const now = Date.now();
-            if (typingStartTime) {
-                typingIntervals.push(now - typingStartTime);
-                keystrokeIntervalsInput.value = JSON.stringify(typingIntervals);
-            }
-            typingStartTime = now;
-        });
-
-        // Typing Speed
-        passwordInput.addEventListener('focus', () => {
-            typingStartTime = Date.now();
-        });
-
-        passwordInput.addEventListener('blur', () => {
-            if (typingStartTime) {
-                const duration = Date.now() - typingStartTime;
-                typingSpeedInput.value = duration;
-            }
-        });
 
         async function validatePassword() {
             const password = passwordInput.value;

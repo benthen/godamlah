@@ -1,1 +1,4 @@
 venv/
+generate_data.py
+train_model.py
+sample_data.csv

@@ -1,12 +1,8 @@
 from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, logout
+
+from django_godamlah import settings
 from .forms import LoginForm, RegisterForm
-from .models import User, Question
-import cv2
-import speech_recognition as sr
-import os
-import json
 from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib import messages
 from django.contrib.auth.hashers import check_password
@@ -14,13 +10,23 @@ from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 from django.contrib.sites.shortcuts import get_current_site
 from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
-import random
-import google.generativeai as genai
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.http import urlsafe_base64_encode
+from .models import User, Question
+from .utils import predict_anomalies
+import speech_recognition as sr
+import numpy as np
+import cv2
+import os
+import json
+import random
+import dlib
+import google.generativeai as genai
+from dotenv import load_dotenv
+load_dotenv()
 
 VERIFICATION_SENTENCE = "I love to play badminton"
-GEMINI_API_KEY = "AIzaSyCNC5a5OIm7Dx0S-wfEGgkT1wU0Ixe7Ijw"
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 GEMINI_MODEL = "gemini-1.5-pro"
 genai.configure(api_key=GEMINI_API_KEY)
 MODEL = genai.GenerativeModel(GEMINI_MODEL)
@@ -78,79 +84,87 @@ def otp_view(request, user_id):
     
     return render(request, 'otp.html', context)
 
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-eye_cascade = cv2.CascadeClassifier('haarcascade_eye_tree_eyeglasses.xml')
+def calculate_eye_aspect_ratio(eye):
+    # Calculate the distances between the vertical landmarks
+    A = np.linalg.norm(eye[1] - eye[5])
+    B = np.linalg.norm(eye[2] - eye[4])
+
+    # Calculate the distance between the horizontal landmarks
+    C = np.linalg.norm(eye[0] - eye[3])
+
+    # Eye Aspect Ratio (EAR)
+    ear = (A + B) / (2.0 * C)
+    return ear
 
 def generate_video_stream():
     video_capture = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    # first_blink = False
-    # second_blink = False
-    # third_blink = False
-    # counter = True
+    EYE_AR_THRESHOLD = 0.18  # Lower the threshold slightly for better sensitivity
+    EYE_AR_CONSEC_FRAMES = 2  # Increase to filter noise and make blinking consistent
+    blink_count = 0
+    global blink_detected
     blink_detected = False
-    first_read = True
-    
+
+    # Initialize the Dlib face detector and shape predictor
+    detector = dlib.get_frontal_face_detector()
+    predictor_path = os.path.join(settings.BASE_DIR, "face_recognition", "shape_predictor_68_face_landmarks.dat")
+    predictor = dlib.shape_predictor(predictor_path)
+
+    (left_eye_start, left_eye_end) = (42, 48)
+    (right_eye_start, right_eye_end) = (36, 42)
+
     if not video_capture.isOpened():
         print("Error: Camera could not be opened.")
         return
 
+    consecutive_frames = 0
+
+    print("hello")
     while True:
         ret, frame = video_capture.read()
         if not ret:
             print("Failed to grab frame")
             break
 
-        # Detect faces
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray_frame = cv2.bilateralFilter(gray_frame,5,1,1)
-        faces = face_cascade.detectMultiScale(gray_frame, scaleFactor=1.3, minNeighbors=5)
 
-        # Draw rectangles around detected faces
-        if(len(faces)>0):
-            for (x, y, w, h) in faces:
-                img = cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
-                
-                # Focus on the face region to detect eyes
-                roi_face = gray_frame[y:y+h,x:x+w]
-                eyes = eye_cascade.detectMultiScale(roi_face,1.3,5,minSize=(50,50))
+        # Detect faces
+        faces = detector(gray_frame)
 
-                # Check for blinking (simulate user behavior)
-                # print(first_blink, second_blink, third_blink)
-                print(len(eyes)>=2)
-                if(len(eyes)>=2):
-                    #Check if program is running for detection 
-                    if(first_read):
-                        cv2.putText(img, 
-                        "Eye detected press s to begin", 
-                        (70,70),  
-                        cv2.FONT_HERSHEY_PLAIN, 3,
-                        (0,255,0),2)
-                        first_read = False
-                    else:
-                        cv2.putText(img, 
-                        "Eyes open!", (70,70), 
-                        cv2.FONT_HERSHEY_PLAIN, 2,
-                        (255,255,255),2)
-                        print("open eyes")
+        if len(faces) > 0:
+            for face in faces:
+                landmarks = predictor(gray_frame, face)
+                landmarks = np.array([(landmarks.part(n).x, landmarks.part(n).y) for n in range(68)])
+
+                left_eye = landmarks[left_eye_start:left_eye_end]
+                right_eye = landmarks[right_eye_start:right_eye_end]
+
+                # Calculate EAR for both eyes
+                left_ear = calculate_eye_aspect_ratio(left_eye)
+                right_ear = calculate_eye_aspect_ratio(right_eye)
+
+                ear = (left_ear + right_ear) / 2.0
+
+                # Display EAR for debugging
+                # cv2.putText(frame, f"EAR: {ear:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
+                if ear < EYE_AR_THRESHOLD:
+                    consecutive_frames += 1
+
+                    if consecutive_frames >= EYE_AR_CONSEC_FRAMES:
+                        blink_count += 1
+                        print(f"Blink detected! Total blinks: {blink_count}")
+                        cv2.putText(
+                            frame, f"Blink detected! Blinks: {blink_count}", (50, 50), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), 2
+                        )
+                        if blink_count == 2:
+                            blink_detected = True
+                        consecutive_frames = 0
                 else:
-                    if(first_read):
-                        #To ensure if the eyes are present before starting
-                        cv2.putText(img, 
-                        "No eyes detected", (70,70),
-                        cv2.FONT_HERSHEY_PLAIN, 3,
-                        (0,0,255),2)
-                        # first_read = True
-                        # counter = True
-                        print("no eyes detected")
-                    else:
-                        #This will print on console and restart the algorithm
-                        print("Blink detected--------------")
-                        cv2.waitKey(3000)
-                        first_read=True
-                        blink_detected = True
-                        break
+                    consecutive_frames = 0
 
-            # When a face is captured, stop streaming and send success message
+                # Draw the landmarks on the eyes
+                # for (x, y) in np.concatenate((left_eye, right_eye), axis=0):
+                #     cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
             if blink_detected:
                 _, buffer = cv2.imencode('.jpg', frame)
                 save_captured_face(buffer)
@@ -158,28 +172,32 @@ def generate_video_stream():
                     b'Content-Type: text/plain\r\n\r\n'
                     b'Face captured successfully\r\n')
                 break
-
-            # Stream the video frame
+            
             _, buffer = cv2.imencode('.jpg', frame)
             frame_bytes = buffer.tobytes()
 
-            yield (b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            yield (
+                b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n'
+            )
+
         else:
-            cv2.putText(frame,
-            "No face detected",(100,100),
-            cv2.FONT_HERSHEY_PLAIN, 3, 
-            (0,255,0),2)
-        
-        #Controlling the algorithm with keys
-        # cv2.imshow('img',img)
+            cv2.putText(
+                frame, "No face detected", (100, 100), cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 2
+            )
 
     video_capture.release()
+    print("stop")
 
 def video_feed(request):
     # Stream the video feed as a multipart response
     return StreamingHttpResponse(generate_video_stream(),
                                  content_type='multipart/x-mixed-replace; boundary=frame')
+    
+def check_blick_detected(request):
+    if blink_detected:  # Replace with actual condition
+        return JsonResponse({"status": "success"})
+    return JsonResponse({"status": "pending"})
 
 def save_captured_face(frame_buffer):
     # Save the captured face in the media storage directory
@@ -225,7 +243,8 @@ def capture_voice_view(request):
                             voice_filename = os.path.join(media_path, 'user_voice.wav')
                             with open(voice_filename, "wb") as f:
                                 f.write(audio.get_wav_data())
-                        return JsonResponse({'message': 'Voice captured successfully', 'path': voice_filename})
+                        # return JsonResponse({'message': 'Voice captured successfully', 'path': voice_filename})
+                        return JsonResponse({'message': 'Voice captured successfully'})
                     elif message == "otp":
                         otp = json.loads(request.body.decode('utf-8')).get('otp')
                         if spoken_text.lower().strip() != str(otp):
@@ -252,11 +271,22 @@ def login_view(request):
             username = form.cleaned_data.get('username')
             mykad = form.cleaned_data.get('identity_number')
             password = form.cleaned_data.get('password')
-            # user = User.objects.get(username=username, identity_number=mykad)
-            # print(check_password(password, user.password))
+            typing_speed = float(request.POST.get('typing_speed'))
+            mouse_movements = float(request.POST.get('mouse_movements'))
+            time_spent = float(request.POST.get('time_spent'))
+            
+            print(typing_speed)
+            print(mouse_movements)
+            print(time_spent)
+            
+             # Predict anomaly
+            is_anomalous = predict_anomalies(typing_speed, mouse_movements, time_spent)
+            
             user = authenticate(request, username=username, password=password, identity_number=mykad)
-            if user is not None:
+            if user is not None and is_anomalous == 0:
                 return redirect('face_recognition:home', user_id=user.pk)  # Redirect to home page or any other page
+            elif user is not None and is_anomalous == 1:
+                return redirect('face_recognition:question_page', user_id=user.pk, question_id=1)
             else:
                 messages.error(request, "Invalid username or password.", extra_tags='danger')
         else:

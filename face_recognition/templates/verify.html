@@ -11,7 +11,7 @@
             <h3>Live Camera Feed</h3>
             <p>Please blink to verify that you are a real user.</p>
             <div id="video-container">
-                <img id="video-feed" src="/video_feed/" alt="Live Video Feed" onerror="retryVideoFeed()">
+                <img id="video-feed" src="/video_feed/" alt="Live Video Feed">
             </div>
             <p id="success-message" style="color: green; font-weight: bold; display: none;">Face successfully captured!
             </p>
@@ -45,13 +45,13 @@
 
 <script>
 
-    function retryVideoFeed() {
+    /*function retryVideoFeed() {
         var videoFeed = document.getElementById('video-feed');
         // Retry loading the video feed after 3 seconds
         setTimeout(function () {
             videoFeed.src = '/video_feed/';
         }, 2000); // 3 seconds delay to retry
-    }
+    }*/
 
     document.addEventListener('DOMContentLoaded', function () {
         const videoFeed = document.getElementById('video-feed');
@@ -61,20 +61,28 @@
 
         // Poll the video stream for success message
         videoFeed.addEventListener('load', function () {
-            fetch('/video_feed/')
-                .then((response) => response.text())
-                .then((data) => {
-                    if (data.includes('Face captured successfully')) {
-                        successMessage.style.display = 'block';
-                        successMessage.innerText = 'Face successfully captured!';
-                        videoFeed.style.display = 'none'; // Hide video feed after success
-                        faceInput.value = 'True'; // Send face recognition flag to server
-                        if (voiceInput.value == "True") {
-                            document.getElementById('hidden-form').submit();
+            const checkStatus = () => {
+                fetch('/check_blink/')  // Separate endpoint for checking status
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.status === 'success') {
+                            console.log("yay");
+                            successMessage.style.display = 'block';
+                            successMessage.innerText = 'Face successfully captured!';
+                            videoFeed.style.display = 'none'; // Hide video feed after success
+                            faceInput.value = 'True'; // Send face recognition flag to server
+                            if (voiceInput.value == "True") {
+                                document.getElementById('hidden-form').submit();
+                            }
+                        } else {
+                            // Poll again after 1 second
+                            setTimeout(checkStatus, 1000);
                         }
-                    }
-                })
-                .catch((err) => console.error('Error checking stream:', err));
+                    })
+                    .catch((err) => console.error('Error checking status:', err));
+            };
+
+            checkStatus();
         });
     });
 

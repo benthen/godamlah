@@ -11,6 +11,7 @@ urlpatterns = [
     path('verify/<int:user_id>/', views.verify, name='verify'),
     path('capture_voice/', views.capture_voice_view, name='capture_voice'),
     path('video_feed/', views.video_feed, name='video_feed'),
+    path('check_blink/', views.check_blick_detected, name='check_blink'),
     path('home/<int:user_id>/', views.home_view, name='home'),
     path('otp/<int:user_id>', views.otp_view, name='otp'),
     path("check-password-hygiene/", views.check_password_hygiene, name='check_password_hygiene'),

@@ -50,7 +50,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'face_recognition.middleware.UserBehaviorMiddleware'
+    # 'face_recognition.middleware.UserBehaviorMiddleware'
 ]
 
 ROOT_URLCONF = 'django_godamlah.urls'
