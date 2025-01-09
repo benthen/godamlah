@@ -1,6 +1,5 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, logout
-
 from django_godamlah import settings
 from .forms import LoginForm, RegisterForm
 from django.http import JsonResponse, StreamingHttpResponse
