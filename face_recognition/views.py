@@ -26,7 +26,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 VERIFICATION_SENTENCE = "I love to play badminton"
+<<<<<<< HEAD
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+=======
+GEMINI_API_KEY = "API_KEY"
+>>>>>>> 3e01c49b7929fd0c77f421009a40c07ec9e30131
 GEMINI_MODEL = "gemini-1.5-pro"
 genai.configure(api_key=GEMINI_API_KEY)
 MODEL = genai.GenerativeModel(GEMINI_MODEL)
